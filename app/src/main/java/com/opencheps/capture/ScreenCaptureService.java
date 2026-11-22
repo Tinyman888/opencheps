@@ -289,7 +289,8 @@ public class ScreenCaptureService extends Service {
             if (gridsEqual(grid, confirmedGrid)) {
                 candidateGrid = null;
                 candidateRepeats = 0;
-                classifier.commitConfirmed(confirmedGrid, bmp, board);
+                // Keep the last verified visual baseline. Re-learning every unchanged
+                // frame can absorb an undetected movement into the old position.
 
                 if (observedStm == userSide && !lastEngineFen.equals(fenOf(confirmedGrid))) {
                     queryEngineAndRender(board, bmp);
@@ -306,7 +307,14 @@ public class ScreenCaptureService extends Service {
             if (!gridsEqual(grid, candidateGrid)) {
                 candidateGrid = grid;
                 candidateRepeats = 1;
-                panelStatus("Saw change…");
+                // Never keep recommending a move from the previous board position.
+                // A later confirmed position (or return to the old one) re-runs analysis.
+                OverlayService.clearArrowsOnly();
+                currentArrows.clear();
+                lastDisplayedArrowFen = "";
+                lastEngineFen = "";
+                panelEval("");
+                panelStatus("Board changed · confirming…");
                 return;
             }
             candidateRepeats++;
