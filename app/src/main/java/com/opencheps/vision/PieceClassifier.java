@@ -118,7 +118,8 @@ public class PieceClassifier {
                 if (d > maxBootstrapNoise) maxBootstrapNoise = d;
             }
         }
-        frameChangeThreshold = Math.max(0.3f, maxBootstrapNoise * 2.0f + 0.1f);
+        // A few unusually different empty squares must not mask a real piece move.
+        frameChangeThreshold = Math.min(2.0f, Math.max(0.3f, maxBootstrapNoise * 2.0f + 0.1f));
 
         trained = true;
         Log.i(TAG, "BOOTSTRAPPED side=" + side
@@ -139,10 +140,19 @@ public class PieceClassifier {
             for (int f = 0; f < 8; f++) {
                 int idx = r * 8 + f;
                 if (previousFrame != null && previousLabels != null) {
+                    char oldPiece = previousLabels[idx];
+                    boolean wasOccupied = oldPiece != '.';
+                    boolean nowOccupied = samples[idx].edgeEnergy >= pieceColorThreshold;
+                    // A changed square's occupancy takes priority over fuzzy pixel similarity.
+                    // This prevents a moved piece from being silently treated as unchanged.
+                    if (wasOccupied != nowOccupied) {
+                        grid[r][f] = nowOccupied ? classifyOne(samples[idx], r, f) : '.';
+                        continue;
+                    }
                     float fd = SquareSampler.lumDistance(
                             samples[idx].feature, previousFrame[idx].feature);
                     if (fd < frameChangeThreshold) {
-                        grid[r][f] = previousLabels[idx];
+                        grid[r][f] = oldPiece;
                         continue;
                     }
                 }
